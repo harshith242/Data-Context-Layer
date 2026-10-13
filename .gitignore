@@ -1,0 +1,17 @@
+# Build outputs and local data (generated; may hold your own data)
+artifacts/
+data/
+runs/
+review/
+eval/
+sources/
+# Secrets and local environment
+.env
+*.env
+.venv/
+# Python caches
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.DS_Store

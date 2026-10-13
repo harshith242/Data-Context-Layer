@@ -1,0 +1,29 @@
+database: {path: data/example.duckdb}
+paths: {artifacts: artifacts, sources: sources, eval: eval, runs: runs, review: review}
+llm: {provider: ollama, model: "qwen3.8:27b", base_url: "http://localhost:11434", retries: 1, parallel_calls: 4, timeout_s: 300}
+embeddings: {provider: ollama, model: "qwen3-embedding:0.6b", query_prefix: "", batch_size: 8, base_url: "http://localhost:11434"}
+agent: {max_tool_calls: 8, max_tool_result_chars: 6000, sql_row_limit: 100, docs_top_k: 5, docs_top_k_max: 20}
+eval:
+  questions_csv: examples/questions.csv
+  question_column: question
+  # Zero or more baselines to compare with. The first with a sql_column is the reference for exec/correctness
+  # scoring; pairwise judging runs against each baseline with an answer_column. Optional per baseline:
+  # time_ms_column, dialect (e.g. spark: SQL that fails on DuckDB is retried transpiled from it).
+  baselines:
+    - {name: reference, sql_column: reference_sql, answer_column: reference_answer,
+       time_ms_column: reference_time_ms}
+  now_anchor: null          # filled from artifacts/semantic.yaml once Plan 2 exists
+  rel_tolerance: 0.005
+  reference_row_limit: 1000   # reference SQL result rows kept; the agent keeps agent.sql_row_limit
+  max_key_values: 10
+  pairwise_passes: 1        # single judge pass (cost); who goes first is a fixed coin per question
+review: {confidence_threshold: 0.8}
+profile: {top_values: 10, max_distinct_for_top: 200, samples: 5, fd_max_distinct: 2000}
+resolve: {fuzzy_min: 90, embed_top_k: 5, judge_batch: 20, judge_workers: 4}
+structured: {moves: {trailing_periods: 26, min_history: 8, z_threshold: 2.0, min_change_pct: 3.0}}
+context: {max_chars: 4000, top_k_items: 12, top_k_entities: 8}
+unstructured: {chunk_tokens: 500, chunk_overlap: 60, event_type_sample: 50, extract_workers: 4,
+               dedupe_days: 3, dedupe_similarity: 0.85, rrf_k: 60}
+linking: {lookback_days: 30, decay_days: 14, top_n: 5,
+          relation_weights: {AFFECTS: 1.0, TAGGED_WITH: 0.5, MENTIONS: 0.3},
+          direction_weights: {match: 1.0, unknown: 1.0, opposite: 1.0}}  # ranking ignores direction; the agent judges it from aspect + direction
