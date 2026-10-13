@@ -18,7 +18,7 @@ from ctxlayer.evaluation.exec_check import exec_agreement
 from ctxlayer.evaluation.judge import Judge
 from ctxlayer.evaluation.questions import Question, question_windows, reference_baseline
 from ctxlayer.evaluation.reference import RefResult, resolve_anchor
-from ctxlayer.reference_agent.api import ReferenceAgent
+from ctxlayer.reference_agent.api import Answer, ReferenceAgent
 
 _ERROR_REASON = "error"
 _DRIVERS = "drivers"
@@ -43,7 +43,9 @@ def sample_questions(questions: list[Question], categories: dict, eval_dir: Path
     """
     path = eval_dir / _SAMPLE_FILE
     saved = read_yaml(path) if path.is_file() else {}
-    if saved.get("n") == n:
+    texts = {q.qid: q.text for q in questions}
+    # A saved sample made for other question texts (rows added, removed or reordered) is not reused.
+    if saved.get("n") == n and all(texts.get(qid) == text for qid, text in saved.get("texts", {}).items()):
         keep = set(saved["qids"])
         return [question for question in questions if question.qid in keep]
 
@@ -68,7 +70,10 @@ def sample_questions(questions: list[Question], categories: dict, eval_dir: Path
          "has_sql": bool(categories[q.qid].get("has_sql"))}
         for q in sorted(chosen, key=lambda q: q.qid)
     ]
-    write_yaml(path, {"n": n, "qids": [item["qid"] for item in picked], "picked": picked})
+    write_yaml(path, {
+        "n": n, "qids": [item["qid"] for item in picked], "texts": {item["qid"]: texts[item["qid"]] for item in picked},
+        "picked": picked,
+    })
     return sorted(chosen, key=lambda q: q.qid)
 
 
@@ -111,7 +116,7 @@ def run_config(
 
     def answer_one(question: Question) -> tuple[str, dict]:
         path = answers_dir / f"{question.qid}.json"
-        saved = None if redo and question.qid in redo else _finished_answer(path)
+        saved = None if redo and question.qid in redo else _finished_answer(path, question.text)
         if saved is not None:
             return question.qid, saved
 
@@ -119,7 +124,14 @@ def run_config(
             local.agent = agent_factory()
             with agents_lock:
                 agents.append(local.agent)
-        answer = dataclasses.asdict(local.agent.answer(question.text))
+        try:
+            answer = dataclasses.asdict(local.agent.answer(question.text))
+        except Exception as error:  # one bad question must not stop the run; it is scored as an error
+            answer = dataclasses.asdict(Answer(
+                "", [], [], 0.0, {"prompt_chars": 0, "reply_chars": 0, "est_tokens": 0},
+                error=f"{type(error).__name__}: {error}",
+            ))
+        answer["question"] = question.text
         path.write_text(json.dumps(answer, indent=2, default=str))
         return question.qid, answer
 
@@ -271,8 +283,8 @@ class _Scorer:
         return self._judge.pairwise(question.text, ours, opponent, opponent_answer, self._passes)
 
 
-def _finished_answer(path: Path) -> dict | None:
-    """The saved answer, or None when missing, unreadable (cut off by an interrupt) or stored with an error."""
+def _finished_answer(path: Path, question: str) -> dict | None:
+    """The saved answer, or None when missing, unreadable (cut off by an interrupt), stored with an error or for another question."""
     if not path.is_file():
         return None
 
@@ -280,6 +292,6 @@ def _finished_answer(path: Path) -> dict | None:
         answer = json.loads(path.read_text())
     except json.JSONDecodeError:
         return None
-    if answer.get("error") is not None:
+    if answer.get("error") is not None or answer.get("question") not in (None, question):
         return None
     return answer

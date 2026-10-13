@@ -62,7 +62,8 @@ def categorize(
     # Human decisions win: {"q001": {..., "source": "human"}} is never re-asked.
     for question in questions:
         existing = known.get(question.qid)
-        if existing and existing.get("source") == _SOURCE_HUMAN:
+        # A human entry saved for another question text (rows moved) is not kept.
+        if existing and existing.get("source") == _SOURCE_HUMAN and existing.get("question", question.text) == question.text:
             entries[question.qid] = existing
             continue
         todo.append(question)

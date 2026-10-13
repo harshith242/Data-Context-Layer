@@ -52,7 +52,7 @@ def test_categorize_prompt_has_tag_ids_text_and_has_sql_but_no_answers_or_sql(tm
 
 def test_categorize_keeps_human_entry_untouched_and_skips_it_in_the_prompt(tmp_path):
     out = tmp_path / "categories.yaml"
-    human = {"question": "old text", "category": "drivers", "confidence": 1.0,
+    human = {"question": "Why did it move?", "category": "drivers", "confidence": 1.0,
              "has_sql": False, "needs_review": False, "source": "human"}
     out.write_text(yaml.safe_dump({"q001": human}))
     questions = [_question(1, "Why did it move?"), _question(2, "Latest value?")]
@@ -64,6 +64,19 @@ def test_categorize_keeps_human_entry_untouched_and_skips_it_in_the_prompt(tmp_p
     assert result["q002"]["category"] == "lookup"
     assert yaml.safe_load(out.read_text())["q001"] == human
     assert "q001" not in llm.calls[0][0]
+
+
+def test_categorize_asks_again_when_a_human_entry_belongs_to_another_question(tmp_path):
+    out = tmp_path / "categories.yaml"
+    human = {"question": "old text", "category": "drivers", "confidence": 1.0,
+             "has_sql": False, "needs_review": False, "source": "human"}
+    out.write_text(yaml.safe_dump({"q001": human}))
+    llm = FakeLLM({"categorize": _reply(("q001", "lookup", 0.5))})
+
+    result = categorize([_question(1, "Why did it move?")], llm, out)
+
+    assert result["q001"]["source"] == "llm"
+    assert "q001" in llm.calls[0][0]
 
 
 def test_categorize_flags_invalid_category_for_review_and_defaults_to_lookup(tmp_path):

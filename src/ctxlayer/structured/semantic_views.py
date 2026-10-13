@@ -74,10 +74,10 @@ def _tables(tree: exp.Expression, views: set[str]) -> tuple[list[str], list[str]
         if not isinstance(table.this, exp.Identifier):
             errors.append(f"table function not allowed: {table.sql(dialect='duckdb')}")
             continue
-        if table.name in ctes:
+        if table.name in ctes and not (table.db or table.catalog):
             continue
         names.add(table.name)
-        if table.name not in views or table.db:
+        if table.name not in views or table.db or table.catalog:
             errors.append(f"not a semantic view: {table.sql(dialect='duckdb')}")
     return sorted(names), errors
 

@@ -224,7 +224,9 @@ def _saved_event_types(out_dir: Path, ontology: dict) -> list[dict]:
     saved = read_yaml(path)
     if saved.get("ontology_version") != ontology["version"]:
         return []
-    return saved.get("induced", saved["event_types"])
+    induced = saved.get("induced", saved["event_types"])
+    # Only the fallback means induction failed; it is kept for this build's prompts but asked again next build.
+    return [] if [item["name"] for item in induced] == [_OTHER_TYPE] else induced
 
 
 def _resolved_row(doc_id: str, item: dict) -> dict:

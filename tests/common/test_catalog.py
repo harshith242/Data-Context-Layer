@@ -283,3 +283,20 @@ def test_catalog_round_trips_through_yaml(built, tmp_path):
     save_catalog(entities, path)
 
     assert load_catalog(path) == entities
+
+
+def test_second_source_in_a_table_adds_to_the_first_instead_of_replacing_it(monkeypatch):
+    from types import SimpleNamespace
+
+    from ctxlayer.common import catalog
+
+    monkeypatch.setattr(catalog, "_distinct", lambda con, table, columns: [("k", "v")])
+    monkeypatch.setattr(catalog, "_identify", lambda source, values: values)
+    monkeypatch.setattr(catalog, "_own_id", lambda source, found: "e1")
+    entities = {"e1": SimpleNamespace(attributes={})}
+    source = SimpleNamespace(table="t", columns=["id"])
+
+    catalog._attach(None, source, ["region"], lambda row: "region:a", "locations", entities)
+    catalog._attach(None, source, ["country"], lambda row: "country:b", "locations", entities)
+
+    assert entities["e1"].attributes["locations"] == ["country:b", "region:a"]

@@ -141,3 +141,16 @@ def test_event_types_are_induced_again_when_the_ontology_version_changed(tmp_pat
     names = [item["name"] for item in read_yaml(out / "event_types.yaml")["event_types"]]
     assert "stale" not in names and names[-1] == "other"
     assert sum(prompt.startswith("[task: event_types]") for prompt, _ in llm.calls) == 1
+
+
+def test_failed_induction_is_not_reused_as_the_induced_types(tmp_path):
+    from ctxlayer.unstructured.phases import _saved_event_types
+
+    ontology = {"version": "v1"}
+    fallback = [{"name": "other", "description": ""}]
+    write_yaml(tmp_path / "event_types.yaml", {"ontology_version": "v1", "event_types": fallback})
+    assert _saved_event_types(tmp_path, ontology) == []
+
+    real = [{"name": "drought", "description": ""}, *fallback]
+    write_yaml(tmp_path / "event_types.yaml", {"ontology_version": "v1", "event_types": real})
+    assert _saved_event_types(tmp_path, ontology) == real

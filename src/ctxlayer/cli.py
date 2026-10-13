@@ -297,6 +297,9 @@ def _run(args: argparse.Namespace) -> int:
     questions = _load_questions(settings)
     categories = _load_categories(eval_dir)
     references = _load_references(eval_dir)
+    stale = [q.qid for q in questions if references.get(q.qid, {}).get("question") not in (None, q.text)]
+    if stale:
+        raise ValueError(f"references.json does not match the questions for {', '.join(stale[:5])}; {_PREPARE_HINT}")
     logger = run_logger(settings)
 
     if args.sample:

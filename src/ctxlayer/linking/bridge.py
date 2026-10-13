@@ -80,7 +80,8 @@ def explain_move(
         return series
 
     first, last = series["definition"]["window"]
-    shown = [move for move in moves if move["entity_id"] in ids and first <= move["date"] <= last]
+    id_set = {str(item) for item in ids}
+    shown = [move for move in moves if str(move["entity_id"]) in id_set and first <= move["date"] <= last]
     coverage = _doc_window(store)
     drivers, note = [], None
     if coverage is None:

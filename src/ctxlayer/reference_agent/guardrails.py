@@ -65,7 +65,8 @@ def precheck(question: str, llm: LLM, data: str = "") -> dict:
         return _result(Action.PROCEED, [], f"unknown guardrail action: {parsed.get('action')!r}", *sizes)
 
     known = {flag.value for flag in Flag}
-    flags = [flag for flag in parsed.get("flags") or [] if flag in known]
+    raw = parsed.get("flags")
+    flags = [flag for flag in raw if isinstance(flag, str) and flag in known] if isinstance(raw, list) else []
     return _result(action, flags, str(parsed.get("reason", "")), *sizes)
 
 

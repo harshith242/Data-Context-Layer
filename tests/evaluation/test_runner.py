@@ -326,3 +326,57 @@ def test_scoring_with_only_keeps_the_other_saved_scores(settings, questions, ref
     assert again[questions[0].qid] == first[questions[0].qid]
     assert again[redo]["correctness"]["verdict"] == "incorrect"
     assert all(questions[1].text in prompt for prompt, _ in judge.calls)  # only the redone question is judged
+
+
+def test_run_config_records_an_unexpected_exception_as_that_questions_error_and_continues(settings, questions):
+    class Crashing(_StubAgent):
+        def answer(self, text):
+            if text == questions[0].text:
+                raise TypeError("unhashable type: 'list'")
+            return super().answer(text)
+
+    answers = run_config(questions, lambda: Crashing(FakeLLM({"answer": "ok"})), "agent", settings.path("paths.eval"), limit=2)
+
+    assert "TypeError" in answers["q001"]["error"]
+    assert answers["q002"]["text"] == "ok"
+
+
+def test_run_config_asks_again_when_the_saved_answer_is_for_another_question(settings, questions):
+    llm = FakeLLM({"answer": "forty-two"})
+    eval_dir = settings.path("paths.eval")
+    run_config(questions, _agent_factory(settings, llm, []), "agent", eval_dir, limit=1)
+    path = eval_dir / "answers" / "agent" / "q001.json"
+    path.write_text(json.dumps({**json.loads(path.read_text()), "question": "an older row"}))
+
+    run_config(questions, _agent_factory(settings, llm, []), "agent", eval_dir, limit=1)
+
+    assert len(llm.calls) == 2
+    assert json.loads(path.read_text())["question"] == questions[0].text
+
+
+def test_sample_is_recomputed_when_the_questions_changed(tmp_path):
+    from ctxlayer.evaluation.questions import Contestant, Question
+    from ctxlayer.evaluation.runner import sample_questions
+
+    blank = Contestant(sql=None, answer="", time_ms=None)
+    questions = [Question(f"q{i:03d}", f"text {i}", {"reference": blank}) for i in range(4)]
+    categories = {q.qid: {"category": "lookup", "has_sql": False} for q in questions}
+    sample_questions(questions, categories, tmp_path, 2)
+
+    changed = [Question(q.qid, f"new {q.text}", q.baselines) for q in questions]
+    picked = sample_questions(changed, categories, tmp_path, 2)
+
+    from ctxlayer.common.files import read_yaml
+    assert read_yaml(tmp_path / "sample.yaml")["texts"] == {q.qid: q.text for q in picked}
+
+
+def test_saved_answer_without_question_text_is_reused_but_a_different_text_is_not(tmp_path):
+    from ctxlayer.evaluation.runner import _finished_answer
+
+    old = tmp_path / "old.json"
+    old.write_text(json.dumps({"text": "x", "error": None}))  # saved before answers stored their question
+    other = tmp_path / "other.json"
+    other.write_text(json.dumps({"text": "x", "error": None, "question": "another question"}))
+
+    assert _finished_answer(old, "current question")["text"] == "x"
+    assert _finished_answer(other, "current question") is None

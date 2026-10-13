@@ -118,6 +118,7 @@ def build_references(questions, con, anchor: date | None, settings: Settings) ->
             for name, contestant in question.baselines.items()
         }
         references[question.qid] = {
+            "question": question.text,
             "baselines": {name: None if result is None else asdict(result) for name, result in results.items()},
             "agree": _baselines_agree(list(results.values()), rel_tol),
         }

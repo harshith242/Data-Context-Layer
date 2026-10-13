@@ -35,3 +35,13 @@ def test_unparseable_reply_proceeds_and_records_reason(reply):
     assert result["action"] == Action.PROCEED.value
     assert result["flags"] == []
     assert result["reason"]
+
+
+@pytest.mark.parametrize("flags", [5, "recommendation", [["recommendation"]], [{"a": 1}]])
+def test_malformed_flags_mean_no_flags(flags):
+    reply = json.dumps({"action": "proceed", "flags": flags, "reason": ""})
+
+    result = precheck("q", _llm(reply))
+
+    assert result["action"] == Action.PROCEED.value
+    assert result["flags"] == []

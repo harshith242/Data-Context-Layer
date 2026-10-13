@@ -202,7 +202,7 @@ def test_build_references_without_baselines_has_no_entries(con, tmp_settings):
 
     refs = build_references([Question(qid="q001", text="x", baselines={})], con, _ANCHOR, settings)
 
-    assert refs == {"q001": {"baselines": {}, "agree": None}}
+    assert refs == {"q001": {"question": "x", "baselines": {}, "agree": None}}
 
 
 def test_build_references_cross_checks_baselines_and_transpiles_by_dialect(con, tmp_settings):

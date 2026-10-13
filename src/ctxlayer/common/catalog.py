@@ -323,7 +323,8 @@ def _attach(con, source: _Source, columns: list[str], to_value: Callable, key: s
             found.setdefault(_own_id(source, own), set()).add(value)
 
     for entity_id, values in found.items():
-        entities[entity_id].attributes[key] = sorted(values)
+        attrs = entities[entity_id].attributes
+        attrs[key] = sorted(set(attrs.get(key, [])) | values)
 
 
 # ----------------------------------------------------------------- LLM steps

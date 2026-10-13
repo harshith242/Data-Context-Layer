@@ -237,3 +237,10 @@ def test_malformed_llm_replies_allow_every_grain_and_no_synonyms(domain_a, domai
     assert semantic["tables"][QUOTES]["time"]["grains"] == ["day", "week", "month", "quarter", "year"]
     assert semantic["synonyms"] == {}
     assert semantic["conversions"] == []
+
+
+def test_validate_sql_rejects_qualified_table_hidden_behind_a_same_named_cte(semantic):
+    result = validate_sql("WITH secret AS (SELECT * FROM src.main.secret) SELECT * FROM secret", semantic)
+
+    assert result["ok"] is False
+    assert any("src.main.secret" in error for error in result["errors"])

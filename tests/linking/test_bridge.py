@@ -295,3 +295,19 @@ def test_default_ranking_ignores_direction_and_drivers_carry_aspect(project_sett
     assert by_id["event:a_down"]["score"] == pytest.approx(by_id["event:b_up"]["score"])
     assert (by_id["event:a_down"]["aspect"], by_id["event:a_down"]["direction"]) == ("output", "down")
     assert (by_id["event:b_up"]["aspect"], by_id["event:b_up"]["direction"]) == ("price", "up")
+
+
+def test_explain_move_matches_moves_whose_entity_id_is_not_a_str(linked, store, out_dir):
+    class Number:  # stands in for an int id read back from JSON
+        def __init__(self, value):
+            self.value = value
+
+        def __str__(self):
+            return self.value
+
+    semantic = read_yaml(out_dir / "semantic.yaml")
+    moves = [{**m, "entity_id": Number(m["entity_id"])} for m in _read_jsonl(out_dir / "structured" / "moves.jsonl")]
+    with contextlib.closing(open_semantic(linked[0])) as con_sem:
+        result = explain_move(con_sem, semantic, store, [], moves, "series:wht_mill_gp", "2025-04", "2025-05")
+
+    assert [m["id"] for m in result["moves"]] == [_MOVE_ID]
